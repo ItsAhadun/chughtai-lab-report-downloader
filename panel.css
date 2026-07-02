@@ -1,0 +1,65 @@
+#cld-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99999;
+  width: 280px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  color: #222;
+}
+
+#cld-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #0a4f9c;
+}
+
+#cld-panel button {
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  background: #0a4f9c;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#cld-panel button:disabled {
+  background: #9bb6d4;
+  cursor: default;
+}
+
+#cld-case-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+#cld-case-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+#cld-case-row button {
+  width: auto;
+  white-space: nowrap;
+}
+
+#cld-status {
+  margin-top: 8px;
+  color: #555;
+  min-height: 16px;
+  word-wrap: break-word;
+}
