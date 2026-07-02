@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chughtai Lab Report Downloader",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Download all reports of a patient, or of a specific case number, from the Chughtai Lab patient dashboard.",
   "permissions": ["downloads"],
   "host_permissions": ["https://reports.chughtailab.com/*"],

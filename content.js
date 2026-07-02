@@ -105,50 +105,72 @@
     else if (msg.phase === 'zip') setStatus('Zipping files…');
   });
 
-  async function downloadReports(caseFilter) {
+  // ---------- patients ----------
+
+  function getPagePatients() {
     const select = document.querySelector('#patient_id');
-    if (!select) {
-      setStatus('Patient dropdown not found — make sure you are logged in.');
-      return;
-    }
-    const patientId = select.value;
-    if (!patientId) {
-      setStatus('Pick a patient in the "Select Patient" dropdown first.');
-      return;
-    }
-    const patientName = select.options[select.selectedIndex].text.trim();
-    const patientLabel = `${patientName} (${patientId})`;
+    if (!select) return [];
+    return Array.from(select.options)
+      .filter((o) => o.value)
+      .map((o) => ({ id: o.value, label: `${o.text.trim()} (${o.value})` }));
+  }
 
-    setStatus('Fetching report list…');
-    const html = await fetchReportsHtml(patientId);
-    let cases = parseCases(html);
+  function getCheckedPatients() {
+    return Array.from(
+      document.querySelectorAll('#cld-patients input[type="checkbox"]:checked')
+    ).map((cb) => ({ id: cb.value, label: cb.dataset.label }));
+  }
 
-    if (caseFilter) {
-      const wanted = caseFilter.replace(/\s+/g, '');
-      cases = cases.filter((c) => c.caseNo.replace(/\s+/g, '').includes(wanted));
-      if (cases.length === 0) {
-        setStatus(`No case matching "${caseFilter}" found for ${patientName}.`);
-        return;
-      }
+  async function downloadReports(caseFilter) {
+    const patients = getCheckedPatients();
+    if (patients.length === 0) {
+      setStatus('Tick at least one patient first.');
+      return;
     }
 
     const files = [];
-    for (const c of cases) {
-      for (const f of c.files) {
-        if (f.isInvoice) continue; // reports only — skip invoices
-        files.push({ url: f.url, name: buildEntryName(c, f) });
+    const fetchErrors = [];
+    let firstCaseNo = '';
+    for (let i = 0; i < patients.length; i++) {
+      const p = patients[i];
+      setStatus(`Fetching report list ${i + 1} of ${patients.length} (${p.label})…`);
+      let cases;
+      try {
+        cases = parseCases(await fetchReportsHtml(p.id));
+      } catch (err) {
+        fetchErrors.push(`${p.label}: ${err.message}`);
+        continue;
+      }
+      if (caseFilter) {
+        const wanted = caseFilter.replace(/\s+/g, '');
+        cases = cases.filter((c) => c.caseNo.replace(/\s+/g, '').includes(wanted));
+      }
+      for (const c of cases) {
+        if (!firstCaseNo && c.caseNo) firstCaseNo = c.caseNo;
+        for (const f of c.files) {
+          if (f.isInvoice) continue; // reports only — skip invoices
+          const name = buildEntryName(c, f);
+          // With several patients, give each their own folder inside the zip
+          files.push({
+            url: f.url,
+            name: patients.length > 1 ? `${sanitize(p.label)}/${name}` : name,
+          });
+        }
       }
     }
+
     if (files.length === 0) {
-      setStatus('No downloadable reports found (reports may still be pending).');
+      if (fetchErrors.length) setStatus(`Error: ${fetchErrors[0]}`);
+      else if (caseFilter) setStatus(`No case matching "${caseFilter}" with downloadable reports found.`);
+      else setStatus('No downloadable reports found (reports may still be pending).');
       return;
     }
 
-    const zipName = sanitize(
-      caseFilter
-        ? `Chughtai Lab - ${patientLabel} - Case ${cases[0].caseNo}`
-        : `Chughtai Lab - ${patientLabel}`
-    ) + '.zip';
+    const base =
+      patients.length === 1
+        ? `Chughtai Lab - ${patients[0].label}`
+        : `Chughtai Lab - ${patients.length} patients`;
+    const zipName = sanitize(caseFilter ? `${base} - Case ${firstCaseNo}` : base) + '.zip';
 
     setStatus(`Fetching ${files.length} file(s)…`);
     const resp = await downloadZip(zipName, files);
@@ -156,9 +178,10 @@
       setStatus(`Error: ${resp.error}`);
       return;
     }
+    const failedCount = (resp.failed ? resp.failed.length : 0) + fetchErrors.length;
     setStatus(
       `Done — ${resp.count} file(s) zipped into ${zipName}` +
-        (resp.failed && resp.failed.length ? ` (${resp.failed.length} failed)` : '') +
+        (failedCount ? ` (${failedCount} failed)` : '') +
         '.'
     );
   }
@@ -176,15 +199,45 @@
     panel.id = 'cld-panel';
     panel.innerHTML = `
       <div id="cld-title">Report Downloader</div>
-      <button id="cld-all" type="button">Download all reports (selected patient)</button>
+      <label id="cld-select-all-row"><input type="checkbox" id="cld-select-all"> Select all patients</label>
+      <div id="cld-patients"></div>
+      <button id="cld-all" type="button">Download reports (checked patients)</button>
       <div id="cld-case-row">
         <input id="cld-case-input" type="text" placeholder="Case number e.g. 50211-18-06">
         <button id="cld-case" type="button">Download case</button>
       </div>
-      <div id="cld-status">Select a patient, then download.</div>
+      <div id="cld-status">Tick patients, then download.</div>
     `;
     document.body.appendChild(panel);
     statusEl = panel.querySelector('#cld-status');
+
+    // Populate patient checklist from the page's own dropdown
+    const listEl = panel.querySelector('#cld-patients');
+    const patients = getPagePatients();
+    if (patients.length === 0) {
+      listEl.textContent = 'No patients found — make sure you are logged in.';
+      panel.querySelector('#cld-select-all-row').style.display = 'none';
+    } else {
+      const selectedNow = document.querySelector('#patient_id')?.value;
+      for (const p of patients) {
+        const row = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = p.id;
+        cb.dataset.label = p.label;
+        cb.checked = p.id === selectedNow;
+        row.appendChild(cb);
+        row.appendChild(document.createTextNode(' ' + p.label));
+        listEl.appendChild(row);
+      }
+    }
+
+    const selectAll = panel.querySelector('#cld-select-all');
+    selectAll.addEventListener('change', () => {
+      listEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.checked = selectAll.checked;
+      });
+    });
 
     const allBtn = panel.querySelector('#cld-all');
     const caseBtn = panel.querySelector('#cld-case');

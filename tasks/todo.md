@@ -38,6 +38,20 @@
       invoice detection uses both the "Invoice" row label and the ?p= URL
       pattern (reports use ?bdl=)
 
+## v4: multi-patient selection (user feedback: dropdown has duplicate
+## registrations of the same people; want all their files at once)
+
+- [x] content.js — patient checklist in the panel (from the page's #patient_id
+      options, IDs shown), select-all toggle; downloads iterate checked
+      patients; per-patient folders inside the zip when >1 checked
+- [x] panel.css — checklist styling
+- [x] manifest.json — version 1.1.0
+- [x] Verify: browser test against saved dashboard HTML with stubbed
+      chrome.runtime + AJAX — 10 checkboxes rendered, 2-patient run produced
+      28 files in 2 folders with no invoice URLs, select-all + case filter
+      produced 10 files, zero-selection shows a message
+- [x] GitHub release with ready-to-install zip
+
 ## Review
 
 - Extension is self-contained (no libraries). One ZIP per download action:
